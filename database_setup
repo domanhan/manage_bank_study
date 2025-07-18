@@ -1,0 +1,88 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jul 11 01:51:14 2025
+
+@author: manha
+"""
+import sqlite3
+import csv
+import os
+
+DATABASE_FILE = "hoc_tap.db"
+CSV_FILE = "chuong_trinh.csv"
+
+def create_database_from_csv():
+    """
+    Hàm này đọc file CSV do người dùng cung cấp và xây dựng database dựa trên cấu trúc đó.
+    """
+    # --- Bước 1: Kiểm tra file CSV ---
+    if not os.path.exists(CSV_FILE):
+        print(f"Lỗi: Không tìm thấy file '{CSV_FILE}'. Vui lòng đảm bảo file CSV nằm cùng thư mục.")
+        return
+
+    # --- Bước 2: Tạo database và các bảng ---
+    print(f"Bắt đầu thiết lập database tại '{DATABASE_FILE}'...")
+    conn = sqlite3.connect(DATABASE_FILE)
+    cursor = conn.cursor()
+
+    # Xóa bảng cũ để đảm bảo dữ liệu luôn được làm mới
+    cursor.execute("DROP TABLE IF EXISTS objectives")
+    
+    # Tạo bảng objectives với đúng 7 cột theo file CSV
+    cursor.execute("""
+    CREATE TABLE objectives (
+        ma_id TEXT PRIMARY KEY,
+        khoi INTEGER,
+        phan TEXT,
+        chuong TEXT,
+        bai TEXT,
+        yeu_cau_can_dat TEXT,
+        dang_toan TEXT
+    );
+    """)
+    print("- Đã tạo bảng 'objectives' với cấu trúc 7 cột.")
+    
+    # Các bảng khác không thay đổi
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS students (
+        student_id INTEGER PRIMARY KEY AUTOINCREMENT, ho_ten TEXT, lop TEXT, sdt_phu_huynh TEXT, ngay_sinh TEXT);
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS progress (
+        progress_id INTEGER PRIMARY KEY AUTOINCREMENT, student_id INTEGER, ma_id_cau_hoi TEXT, ket_qua TEXT);
+    """)
+    conn.commit()
+    print("- Đã tạo các bảng 'students' và 'progress'.")
+
+    # --- Bước 3: Đọc và nhập dữ liệu từ CSV ---
+    print(f"\nBắt đầu nhập dữ liệu từ '{CSV_FILE}'...")
+    try:
+        with open(CSV_FILE, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader) # Đọc dòng tiêu đề
+            
+            # Câu lệnh INSERT với đúng 7 cột
+            insert_query = "INSERT INTO objectives (ma_id, khoi, phan, chuong, bai, yeu_cau_can_dat, dang_toan) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            
+            count = 0
+            for row in reader:
+                if not any(field.strip() for field in row): # Bỏ qua các dòng trống
+                    continue
+                if len(row) == 7:
+                    cursor.execute(insert_query, row)
+                    count += 1
+                else:
+                    print(f"(!) Cảnh báo: Bỏ qua dòng không hợp lệ (cần 7 cột): {row}")
+            
+            conn.commit()
+            print(f"✅ Nhập thành công {count} dòng dữ liệu vào database!")
+
+    except Exception as e:
+        print(f"Đã xảy ra lỗi trong quá trình nhập dữ liệu: {e}")
+    finally:
+        conn.close()
+
+
+# --- Chạy chương trình chính ---
+if __name__ == "__main__":
+    create_database_from_csv()
